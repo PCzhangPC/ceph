@@ -277,12 +277,14 @@ void get_arguments(po::options_description *positional,
   options->add_options()
     ("long,l", po::bool_switch(), "long listing format");
   at::add_pool_options(positional, options);
+  at::add_namespace_options(positional, options);
   at::add_format_options(options);
 }
 
 int execute(const po::variables_map &vm) {
   size_t arg_index = 0;
   std::string pool_name = utils::get_pool_name(vm, &arg_index);
+  std::string nspace = utils::get_namespace(vm);
 
   at::Format::Formatter formatter;
   int r = utils::get_formatter(vm, &formatter);
