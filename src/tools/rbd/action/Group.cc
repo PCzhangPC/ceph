@@ -33,7 +33,7 @@ int execute_create(const po::variables_map &vm) {
   librados::Rados rados;
   librados::IoCtx io_ctx;
 
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -61,7 +61,7 @@ int execute_list(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -103,7 +103,7 @@ int execute_remove(const po::variables_map &vm) {
   librados::Rados rados;
   librados::IoCtx io_ctx;
 
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -147,13 +147,13 @@ int execute_add(const po::variables_map &vm) {
   librados::Rados rados;
 
   librados::IoCtx cg_io_ctx;
-  r = utils::init(group_pool_name, &rados, &cg_io_ctx);
+  r = utils::init(group_pool_name, "", &rados, &cg_io_ctx);
   if (r < 0) {
     return r;
   }
 
   librados::IoCtx image_io_ctx;
-  r = utils::init(image_pool_name, &rados, &image_io_ctx);
+  r = utils::init(image_pool_name, "", &rados, &image_io_ctx);
   if (r < 0) {
     return r;
   }
@@ -215,13 +215,13 @@ int execute_remove_image(const po::variables_map &vm) {
   librados::Rados rados;
 
   librados::IoCtx cg_io_ctx;
-  r = utils::init(group_pool_name, &rados, &cg_io_ctx);
+  r = utils::init(group_pool_name, "", &rados, &cg_io_ctx);
   if (r < 0) {
     return r;
   }
 
   librados::IoCtx image_io_ctx;
-  r = utils::init(image_pool_name, &rados, &image_io_ctx);
+  r = utils::init(image_pool_name, "", &rados, &image_io_ctx);
   if (r < 0) {
     return r;
   }
@@ -268,7 +268,7 @@ int execute_list_images(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
