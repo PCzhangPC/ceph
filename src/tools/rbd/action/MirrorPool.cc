@@ -525,7 +525,7 @@ int execute_peer_add(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -588,7 +588,7 @@ int execute_peer_remove(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -634,7 +634,7 @@ int execute_peer_set(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -670,7 +670,7 @@ int execute_enable_disable(const std::string &pool_name,
   librados::IoCtx io_ctx;
   rbd_mirror_mode_t current_mirror_mode;
 
-  int r = utils::init(pool_name, &rados, &io_ctx);
+  int r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -757,7 +757,7 @@ int execute_info(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -834,7 +834,7 @@ int execute_status(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  r = utils::init(pool_name, &rados, &io_ctx);
+  r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -927,7 +927,7 @@ int execute_promote(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  int r = utils::init(pool_name, &rados, &io_ctx);
+  int r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
@@ -952,7 +952,7 @@ int execute_demote(const po::variables_map &vm) {
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  int r = utils::init(pool_name, &rados, &io_ctx);
+  int r = utils::init(pool_name, "", &rados, &io_ctx);
   if (r < 0) {
     return r;
   }
