@@ -170,6 +170,7 @@ public:
 
 
   // Namespace support functions
+  int namespace_add(IoCtx& io_ctx, const std::string &nspace);
   int namespace_list(IoCtx& io_ctx, std::set<std::string>& namespaces);
 
   // RBD pool mirroring support functions
