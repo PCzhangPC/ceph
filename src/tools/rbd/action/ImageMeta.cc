@@ -117,6 +117,29 @@ static int do_metadata_get(librbd::Image& image, const char *key)
   return r;
 }
 
+static int do_metadata_purge(librbd::Image& image)
+{
+    std::map<std::string, bufferlist> pairs;
+    int r;
+
+    r = image.metadata_list("", 0, &pairs);
+    if (r < 0)
+        return r;
+
+    if (!pairs.empty()) {
+        for (std::map<std::string, bufferlist>::iterator it = pairs.begin();
+             it != pairs.end(); ++it) {
+            r = image.metadata_remove(it->first.c_str());
+            if (r < 0){
+                std::cerr << "failed to remove metadata " << it->first.c_str() << " of image : "
+                          << cpp_strerror(r) << std::endl;
+                return r;
+            }
+        }
+    }
+    return r;
+}
+
 void get_list_arguments(po::options_description *positional,
                         po::options_description *options) {
   at::add_image_spec_options(positional, options, at::ARGUMENT_MODIFIER_NONE);
@@ -293,6 +316,42 @@ int execute_remove(const po::variables_map &vm) {
   return 0;
 }
 
+void get_purge_arguments(po::options_description *positional,
+                         po::options_description *options){
+  at::add_image_spec_options(positional, options, at::ARGUMENT_MODIFIER_NONE);
+  add_key_option(positional);
+}
+
+int execute_purge(const po::variables_map &vm){
+  size_t arg_index = 0;
+  std::string pool_name;
+  std::string image_name;
+  std::string snap_name;
+  int r = utils::get_pool_image_snapshot_names(
+          vm, at::ARGUMENT_MODIFIER_NONE, &arg_index, &pool_name, &image_name,
+          &snap_name, utils::SNAPSHOT_PRESENCE_NONE, utils::SPEC_VALIDATION_NONE);
+  if (r < 0) {
+    return r;
+  }
+
+  librados::Rados rados;
+  librados::IoCtx io_ctx;
+  librbd::Image image;
+  r = utils::init_and_open_image(pool_name, image_name, "", "", false,
+                                 &rados, &io_ctx, &image);
+  if (r < 0) {
+    return r;
+  }
+
+  r = do_metadata_purge(image);
+  if (r < 0) {
+    std::cerr << "rbd: purging metadata failed: " << cpp_strerror(r)
+              << std::endl;
+    return r;
+  }
+  return 0;
+}
+
 Shell::Action action_list(
   {"image-meta", "list"}, {}, "Image metadata list keys with values.", "",
   &get_list_arguments, &execute_list);
@@ -307,6 +366,12 @@ Shell::Action action_remove(
   {"image-meta", "remove"}, {},
   "Image metadata remove the key and value associated.", "",
   &get_remove_arguments, &execute_remove);
+
+
+Shell::Action action_purge(
+  {"image-meta", "purge"}, {},
+  "Image metadata remove all the keys and values associated at one time.", "",
+  &get_purge_arguments, &execute_purge);
 
 } // namespace image_meta
 } // namespace action
