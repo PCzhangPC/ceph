@@ -260,7 +260,7 @@ int get_special_pool_ns_names(const po::variables_map &vm,
   }
 
   if (pool_name->empty()) {
-    *pool_name = at::DEFAULT_POOL_NAME;
+    *pool_name = get_default_pool_name();
   }
 
   if (ns_name->empty()) {
