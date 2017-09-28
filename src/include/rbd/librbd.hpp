@@ -168,8 +168,6 @@ public:
                                  bool force, ProgressContext &pctx);
   int trash_restore(IoCtx &io_ctx, const char *id, const char *name);
 
-  int rename(IoCtx& src_io_ctx, const char *srcname, const char *destname);
-
   // Namespace support functions
   int namespace_exists(IoCtx& io_ctx, const std::string &nspace, bool *exists);
   int namespace_add(IoCtx& io_ctx, const std::string &nspace);

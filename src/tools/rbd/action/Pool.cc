@@ -20,6 +20,7 @@ namespace po = boost::program_options;
 void get_arguments_init(po::options_description *positional,
                         po::options_description *options) {
   at::add_pool_options(positional, options);
+  at::add_namespace_options(positional, options);
   options->add_options()
       ("force", po::bool_switch(),
        "force initialize pool for RBD use if registered by another application");
@@ -28,10 +29,11 @@ void get_arguments_init(po::options_description *positional,
 int execute_init(const po::variables_map &vm) {
   size_t arg_index = 0;
   std::string pool_name = utils::get_pool_name(vm, &arg_index);
+  std::string nspace = utils::get_namespace(vm);
 
   librados::Rados rados;
   librados::IoCtx io_ctx;
-  int r = utils::init(pool_name, &rados, &io_ctx);
+  int r = utils::init(pool_name, nspace, &rados, &io_ctx);
   if (r < 0) {
     return r;
   }

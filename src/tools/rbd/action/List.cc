@@ -41,7 +41,8 @@ struct WorkerEntry {
 };
 
 
-int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Formatter *f, TextTable &tbl)
+int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Formatter *f,
+                       TextTable &tbl, std::string nspace)
 {
   int r = 0;
   librbd::image_info_t info;
@@ -88,6 +89,7 @@ int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Forma
     f->dump_int("format", old_format ? 1 : 2);
     if (!lockers.empty())
       f->dump_string("lock_type", exclusive ? "exclusive" : "shared");
+    f->dump_string("namespace", nspace == "" ? "default" : nspace);
     f->close_section();
   } else {
     tbl << w->name
@@ -96,6 +98,7 @@ int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Forma
         << ((old_format) ? '1' : '2')
         << ""                         // protect doesn't apply to images
         << lockstr
+        << (nspace == "" ? "default" : nspace)
         << TextTable::endrow;
   }
 
@@ -128,6 +131,7 @@ int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Forma
         }
         f->dump_int("format", old_format ? 1 : 2);
         f->dump_string("protected", is_protected ? "true" : "false");
+        f->dump_string("namespace", nspace == "" ? "default" : nspace);
         f->close_section();
       } else {
         tbl << w->name + "@" + s->name
@@ -136,6 +140,7 @@ int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Forma
             << ((old_format) ? '1' : '2')
             << (is_protected ? "yes" : "")
             << ""                     // locks don't apply to snaps
+            << (nspace == "" ? "default" : nspace)
             << TextTable::endrow;
       }
     }
@@ -144,7 +149,8 @@ int list_process_image(librados::Rados* rados, WorkerEntry* w, bool lflag, Forma
   return 0;
 }
 
-int do_list(std::string &pool_name, bool lflag, int threads, Formatter *f) {
+int do_list(std::string &pool_name, bool lflag, int threads,
+            const std::string nspace, bool all_ns, Formatter *f) {
   std::vector<WorkerEntry*> workers;
   std::vector<std::string> names;
   librados::Rados rados;
@@ -158,16 +164,23 @@ int do_list(std::string &pool_name, bool lflag, int threads, Formatter *f) {
     threads = 32;
   }
 
-  int r = utils::init(pool_name, &rados, &ioctx);
+  int r = utils::init(pool_name, nspace, &rados, &ioctx);
   if (r < 0) {
     return r;
   }
 
-  r = rbd.list(ioctx, names);
-  if (r < 0)
-    return r;
-
   if (!lflag) {
+    if (all_ns) {
+      std::cerr << "--all option should be used with --long." << std::endl;
+      return -EINVAL;
+    }
+    r = rbd.list(ioctx, names);
+
+    if (r == -ENOENT)
+      r = 0;
+    if (r < 0)
+      return r;
+
     if (f)
       f->open_array_section("images");
     for (std::vector<std::string>::const_iterator i = names.begin();
@@ -195,64 +208,86 @@ int do_list(std::string &pool_name, bool lflag, int threads, Formatter *f) {
     tbl.define_column("FMT", TextTable::RIGHT, TextTable::RIGHT);
     tbl.define_column("PROT", TextTable::LEFT, TextTable::LEFT);
     tbl.define_column("LOCK", TextTable::LEFT, TextTable::LEFT);
+    tbl.define_column("NAMESPACE", TextTable::LEFT, TextTable::LEFT);
   }
 
-  for (int left = 0; left < std::min(threads, (int)names.size()); left++) {
-    workers.push_back(new WorkerEntry());
+  set<std::string> namespaces;
+  if (all_ns) {
+    rbd.namespace_list(ioctx, namespaces);
+  } else {
+    namespaces.insert(nspace);
   }
 
-  auto i = names.begin();
-  while (true) {
-    size_t workers_idle = 0;
-    for (auto comp : workers) {
-      switch (comp->state) {
-	case STATE_DONE:
-	  comp->completion->wait_for_complete();
-	  comp->state = STATE_IDLE;
-	  comp->completion->release();
-	  comp->completion = nullptr;
-	  // we want it to fall through in this case
-	case STATE_IDLE:
-	  if (i == names.end()) {
-	    workers_idle++;
-	    continue;
-	  }
-	  comp->name = *i;
-	  comp->completion = new librbd::RBD::AioCompletion(nullptr, nullptr);
-	  r = rbd.aio_open_read_only(ioctx, comp->img, i->c_str(), NULL, comp->completion);
-	  i++;
-	  comp->state = STATE_OPENED;
-	  break;
-	case STATE_OPENED:
-	  comp->completion->wait_for_complete();
-	  // image might disappear between rbd.list() and rbd.open(); ignore
-	  // that, warn about other possible errors (EPERM, say, for opening
-	  // an old-format image, because you need execute permission for the
-	  // class method)
-	  r = comp->completion->get_return_value();
-	  comp->completion->release();
-	  if (r < 0) {
-	    if (r != -ENOENT) {
-	      std::cerr << "rbd: error opening " << *i << ": " << cpp_strerror(r)
-			<< std::endl;
-	    }
-	    // in any event, continue to next image
-	    comp->state = STATE_IDLE;
-	    continue;
-	  }
-	  r = list_process_image(&rados, comp, lflag, f, tbl);
-	  if (r < 0) {
-	      std::cerr << "rbd: error processing image  " << comp->name << ": " << cpp_strerror(r)
-			<< std::endl;
-	  }
-	  comp->completion = new librbd::RBD::AioCompletion(nullptr, nullptr);
-	  r = comp->img.aio_close(comp->completion);
-	  comp->state = STATE_DONE;
-	  break;
-      }
+  for (std::set<std::string>::iterator iter = namespaces.begin();
+              iter != namespaces.end(); ++iter) {
+
+    std::string ns = *iter;
+    ioctx.set_namespace(ns);
+    names.clear();
+    r = rbd.list(ioctx, names);
+
+    if (r == -ENOENT)
+      r = 0;
+    if (r < 0)
+      return r;
+
+    for (int left = 0; left < std::min(threads, (int)names.size()); left++) {
+      workers.push_back(new WorkerEntry());
     }
-    if (workers_idle == workers.size()) {
-	break;
+
+    auto i = names.begin();
+    while (true) {
+      size_t workers_idle = 0;
+      for (auto comp : workers) {
+        switch (comp->state) {
+          case STATE_DONE:
+            comp->completion->wait_for_complete();
+            comp->state = STATE_IDLE;
+            comp->completion->release();
+            comp->completion = nullptr;
+            // we want it to fall through in this case
+          case STATE_IDLE:
+            if (i == names.end()) {
+              workers_idle++;
+              continue;
+            }
+            comp->name = *i;
+            comp->completion = new librbd::RBD::AioCompletion(nullptr, nullptr);
+            r = rbd.aio_open_read_only(ioctx, comp->img, i->c_str(), NULL, comp->completion);
+            i++;
+            comp->state = STATE_OPENED;
+            break;
+          case STATE_OPENED:
+            comp->completion->wait_for_complete();
+            // image might disappear between rbd.list() and rbd.open(); ignore
+            // that, warn about other possible errors (EPERM, say, for opening
+            // an old-format image, because you need execute permission for the
+            // class method)
+            r = comp->completion->get_return_value();
+            comp->completion->release();
+            if (r < 0) {
+              if (r != -ENOENT) {
+                std::cerr << "rbd: error opening " << *i << ": " << cpp_strerror(r)
+                          << std::endl;
+              }
+              // in any event, continue to next image
+              comp->state = STATE_IDLE;
+              continue;
+            }
+            r = list_process_image(&rados, comp, lflag, f, tbl, ns);
+            if (r < 0) {
+              std::cerr << "rbd: error processing image  " << comp->name << ": " << cpp_strerror(r)
+                        << std::endl;
+            }
+            comp->completion = new librbd::RBD::AioCompletion(nullptr, nullptr);
+            r = comp->img.aio_close(comp->completion);
+            comp->state = STATE_DONE;
+            break;
+        }
+      }
+      if (workers_idle == workers.size()) {
+        break;
+      }
     }
   }
 
@@ -275,7 +310,8 @@ int do_list(std::string &pool_name, bool lflag, int threads, Formatter *f) {
 void get_arguments(po::options_description *positional,
                    po::options_description *options) {
   options->add_options()
-    ("long,l", po::bool_switch(), "long listing format");
+    ("long,l", po::bool_switch(), "long listing format")
+     ("all", po::bool_switch(), "list on all namespace");
   at::add_pool_options(positional, options);
   at::add_namespace_options(positional, options);
   at::add_format_options(options);
@@ -294,7 +330,7 @@ int execute(const po::variables_map &vm) {
 
   r = do_list(pool_name, vm["long"].as<bool>(),
               g_conf->get_val<int64_t>("rbd_concurrent_management_ops"),
-              formatter.get());
+              nspace, vm["all"].as<bool>(), formatter.get());
   if (r < 0) {
     std::cerr << "rbd: list: " << cpp_strerror(r) << std::endl;
     return r;

@@ -2986,11 +2986,12 @@ int namespace_list(cls_method_context_t hctx, bufferlist *in, bufferlist *out)
   int r = max_read;
   set<string> namespaces;
   string last_read = start_after;
+  bool more;
 
   while (r == max_read && (max_return == 0 || namespaces.size() < max_return)) {
     set<string> keys;
 
-    r = cls_cxx_map_get_keys(hctx, last_read, max_read, &keys);
+    r = cls_cxx_map_get_keys(hctx, last_read, max_read, &keys, &more);
     if (r < 0) {
       CLS_ERR("error reading namespaces: %s", cpp_strerror(r).c_str());
       return r;

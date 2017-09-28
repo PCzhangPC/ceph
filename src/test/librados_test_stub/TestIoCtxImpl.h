@@ -14,9 +14,6 @@
 #include "common/snap_types.h"
 #include "osd/osd_types.h"
 
-#include <boost/function.hpp>
-#include <list>
-
 
 namespace librados {
 
@@ -43,6 +40,7 @@ private:
 class TestIoCtxImpl {
 public:
   typedef boost::function<int(TestIoCtxImpl *, const std::string &)> Operation;
+
 
   TestIoCtxImpl();
   explicit TestIoCtxImpl(TestRadosClient *client, int64_t m_pool_id,
@@ -193,8 +191,6 @@ private:
   std::string m_pool_name;
   snap_t m_snap_seq;
   SnapContext m_snapc;
-  atomic_t m_refcount;
-  atomic_t m_pending_ops;
   object_locator_t oloc;
   std::atomic<uint64_t> m_refcount = { 0 };
   std::atomic<uint64_t> m_pending_ops = { 0 };
